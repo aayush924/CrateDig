@@ -10,11 +10,13 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { Settings } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { useSpotifyAuth } from '@/hooks/useSpotifyAuth';
 import { getFeaturedPlaylists, getRecentlyPlayed, getTopArtists } from '@/lib/spotify';
 import { colors } from '@/constants/theme';
 
 const HomeScreen = () => {
+  const router = useRouter();
   const { token, loading: authLoading, login } = useSpotifyAuth();
   const [featuredPlaylists, setFeaturedPlaylists] = useState([]);
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
@@ -47,6 +49,10 @@ const HomeScreen = () => {
     }
   };
 
+  const handlePressAlbum = (albumId: string) => {
+    router.push(`/album/${albumId}`);
+  };
+
   const renderSection = (title: string, data: any[]) => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -55,7 +61,10 @@ const HomeScreen = () => {
         data={data}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <TouchableOpacity 
+            style={styles.card}
+            onPress={() => handlePressAlbum(item.id)}
+          >
             <Image 
               source={{ uri: item.images?.[0]?.url || 'https://images.pexels.com/photos/1626481/pexels-photo-1626481.jpeg' }} 
               style={styles.albumArt} 
@@ -66,7 +75,7 @@ const HomeScreen = () => {
                 {item.artists.map((artist: any) => artist.name).join(', ')}
               </Text>
             )}
-          </View>
+          </TouchableOpacity>
         )}
         showsHorizontalScrollIndicator={false}
       />

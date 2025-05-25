@@ -86,3 +86,7 @@ export async function getFeaturedPlaylists(token: string) {
 export async function getTopArtists(token: string) {
   return fetchSpotifyApi('/me/top/artists?limit=10', token);
 }
+
+export async function getAlbumDetails(token: string, albumId: string) {
+  return fetchSpotifyApi(`/albums/${albumId}`, token);
+}

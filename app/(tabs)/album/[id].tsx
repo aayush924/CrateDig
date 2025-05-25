@@ -1,86 +1,49 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import { useSpotifyAuth } from '@/hooks/useSpotifyAuth';
 import AlbumDetail from '@/components/AlbumDetail';
 import ReviewList from '@/components/ReviewList';
 import { colors } from '@/constants/theme';
-
-// Mock data for album details
-const albumData = {
-  id: '1',
-  title: 'Melodrama',
-  artist: 'Lorde',
-  image: 'https://images.pexels.com/photos/761963/pexels-photo-761963.jpeg',
-  releaseYear: '2017',
-  genre: 'Pop',
-  averageRating: 4.7,
-  totalReviews: 1528,
-  totalListens: 15243,
-  description: 'Melodrama is the second studio album by New Zealand singer-songwriter Lorde, released through Republic Records on June 16, 2017. Following the success of her debut album Pure Heroine, Lorde retreated from public spotlight, and traveled between New Zealand and the United States to write the album.',
-};
-
-// Mock data for reviews
-const reviewsData = [
-  {
-    id: '1',
-    user: {
-      id: '101',
-      username: 'musiclover42',
-      avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg',
-    },
-    rating: 5,
-    content: 'A masterpiece that captures the essence of young adulthood. Every track is brilliant, from the opening notes of "Green Light" to the final moments of "Perfect Places."',
-    timestamp: '2 weeks ago',
-    likes: 42,
-    comments: 8,
-  },
-  {
-    id: '2',
-    user: {
-      id: '102',
-      username: 'beatmaster',
-      avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg',
-    },
-    rating: 4.5,
-    content: 'The production on this album is incredible. Jack Antonoff and Lorde created something truly special here. "Liability" still makes me emotional every time I hear it.',
-    timestamp: '1 month ago',
-    likes: 31,
-    comments: 5,
-  },
-  {
-    id: '3',
-    user: {
-      id: '103',
-      username: 'vinylcollector',
-      avatar: 'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg',
-    },
-    rating: 5,
-    content: 'One of the best pop albums of the decade. The songwriting is mature beyond her years, and the sonic landscape is both experimental and accessible.',
-    timestamp: '2 months ago',
-    likes: 56,
-    comments: 12,
-  },
-];
+import { getAlbumDetails } from '@/lib/spotify';
 
 export default function AlbumDetailScreen() {
   const { id } = useLocalSearchParams();
+  const { token } = useSpotifyAuth();
+  const [album, setAlbum] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showReviews, setShowReviews] = useState(false);
   
-  // In a real app, fetch album details based on id
-  const album = albumData;
+  useEffect(() => {
+    if (token && id) {
+      fetchAlbumDetails();
+    }
+  }, [token, id]);
+  
+  const fetchAlbumDetails = async () => {
+    try {
+      setLoading(true);
+      const data = await getAlbumDetails(token, id as string);
+      setAlbum(data);
+    } catch (err) {
+      setError('Failed to load album details');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const handleAddToCollection = () => {
-    // Logic to add album to collection
+    // Implement add to collection functionality
     console.log('Add to collection:', id);
   };
   
   const handleShareAlbum = () => {
-    // Logic to share album
+    // Implement share functionality
     console.log('Share album:', id);
   };
   
   const handleViewReviews = () => {
-    // Toggle reviews section
     setShowReviews(true);
   };
   
@@ -88,24 +51,42 @@ export default function AlbumDetailScreen() {
     // Navigate to write review screen
     console.log('Write review for:', id);
   };
-  
-  const handleLikeReview = (reviewId: string) => {
-    console.log('Like review:', reviewId);
-  };
-  
-  const handleCommentReview = (reviewId: string) => {
-    console.log('Comment on review:', reviewId);
-  };
-  
-  const handleViewProfile = (userId: string) => {
-    console.log('View profile:', userId);
-  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (error || !album) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error || 'Album not found'}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchAlbumDetails}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <ScrollView>
         <AlbumDetail 
-          album={album}
+          album={{
+            id: album.id,
+            title: album.name,
+            artist: album.artists[0].name,
+            image: album.images[0].url,
+            releaseYear: new Date(album.release_date).getFullYear().toString(),
+            genre: album.genres[0] || 'Unknown',
+            averageRating: album.popularity / 20, // Convert popularity to 5-star scale
+            totalReviews: Math.floor(album.popularity * 10),
+            totalListens: album.popularity * 1000,
+            description: album.description || `${album.name} is an album by ${album.artists[0].name}, released on ${album.release_date}.`,
+          }}
           onAddToCollection={handleAddToCollection}
           onShareAlbum={handleShareAlbum}
           onViewReviews={handleViewReviews}
@@ -114,10 +95,10 @@ export default function AlbumDetailScreen() {
         
         {showReviews && (
           <ReviewList 
-            reviews={reviewsData}
-            onLikeReview={handleLikeReview}
-            onCommentReview={handleCommentReview}
-            onViewProfile={handleViewProfile}
+            reviews={[]} // Implement real reviews later
+            onLikeReview={() => {}}
+            onCommentReview={() => {}}
+            onViewProfile={() => {}}
           />
         )}
       </ScrollView>
@@ -129,5 +110,36 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    padding: 20,
+  },
+  errorText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 16,
+    color: colors.error,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+    color: colors.buttonText,
   },
 });
