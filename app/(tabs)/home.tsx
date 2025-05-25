@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,47 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  FlatList
+  FlatList,
+  ActivityIndicator
 } from 'react-native';
 import { Settings } from 'lucide-react-native';
+import { useSpotifyAuth } from '@/hooks/useSpotifyAuth';
+import { getFeaturedPlaylists, getRecentlyPlayed, getTopArtists } from '@/lib/spotify';
+import { colors } from '@/constants/theme';
 
 const HomeScreen = () => {
+  const { token, loading: authLoading, login } = useSpotifyAuth();
+  const [featuredPlaylists, setFeaturedPlaylists] = useState([]);
+  const [recentlyPlayed, setRecentlyPlayed] = useState([]);
+  const [topArtists, setTopArtists] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (token) {
+      fetchSpotifyData();
+    }
+  }, [token]);
+
+  const fetchSpotifyData = async () => {
+    try {
+      setLoading(true);
+      const [playlists, recent, artists] = await Promise.all([
+        getFeaturedPlaylists(token),
+        getRecentlyPlayed(token),
+        getTopArtists(token)
+      ]);
+
+      setFeaturedPlaylists(playlists.playlists.items);
+      setRecentlyPlayed(recent.items);
+      setTopArtists(artists.items);
+    } catch (err) {
+      setError('Failed to load music data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderSection = (title: string, data: any[]) => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -20,9 +56,16 @@ const HomeScreen = () => {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <Image source={{ uri: item.image }} style={styles.albumArt} />
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            {item.artist && <Text style={styles.cardSubtitle}>{item.artist}</Text>}
+            <Image 
+              source={{ uri: item.images?.[0]?.url || 'https://images.pexels.com/photos/1626481/pexels-photo-1626481.jpeg' }} 
+              style={styles.albumArt} 
+            />
+            <Text style={styles.cardTitle}>{item.name}</Text>
+            {item.artists && (
+              <Text style={styles.cardSubtitle}>
+                {item.artists.map((artist: any) => artist.name).join(', ')}
+              </Text>
+            )}
           </View>
         )}
         showsHorizontalScrollIndicator={false}
@@ -30,77 +73,96 @@ const HomeScreen = () => {
     </View>
   );
 
-  const trendingCrates = [
-    { id: '1', title: 'Top 50 EDM Albums', image: 'https://via.placeholder.com/150' },
-    { id: '2', title: 'Every Grammy Nominated Album', image: 'https://via.placeholder.com/150' },
-    { id: '3', title: 'Standout Hip-Hop Artists', image: 'https://via.placeholder.com/150' },
-  ];
+  if (authLoading || loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
-  const friendsFavorites = [
-    { id: '4', title: 'Pet Sounds', artist: 'by The Beach Boys', image: 'https://via.placeholder.com/150' },
-    { id: '5', title: 'Blonde on Blonde', artist: 'by Bob Dylan', image: 'https://via.placeholder.com/150' },
-    { id: '6', title: 'Rumours', artist: 'by Fleetwood Mac', image: 'https://via.placeholder.com/150' },
-  ];
-
-  const hiddenGems = [
-    { id: '7', title: 'Dark Side of the Moon', artist: 'by Pink Floyd', image: 'https://via.placeholder.com/150' },
-    { id: '8', title: 'Thriller', artist: 'by Michael Jackson', image: 'https://via.placeholder.com/150' },
-  ];
-
-  const communityDiscussions = [
-    {
-      id: '1',
-      title: 'Who won the Kendrick and Drake Beef?',
-      user: '@vinyllover',
-      time: '2h',
-      comments: '54 comments',
-      image: 'https://via.placeholder.com/100x100'
-    },
-    {
-      id: '2',
-      title: 'What are your favorite underground Indie albums?',
-      user: '@vinylholic',
-      time: '1h',
-      comments: '23 comments',
-      image: 'https://via.placeholder.com/100x100'
-    }
-  ];
+  if (!token) {
+    return (
+      <View style={styles.authContainer}>
+        <Text style={styles.authTitle}>Connect with Spotify</Text>
+        <Text style={styles.authSubtitle}>
+          Sign in to access your music library and discover new tracks
+        </Text>
+        <TouchableOpacity style={styles.authButton} onPress={login}>
+          <Text style={styles.authButtonText}>Connect Spotify</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.navbar}>
-        <Text style={styles.logo}><Text style={{ color: '#FFC107' }}>CRATE</Text>DIG</Text>
-        <Settings color="black" />
+        <Text style={styles.logo}>
+          <Text style={{ color: colors.primary }}>CRATE</Text>DIG
+        </Text>
+        <Settings color={colors.text} size={24} />
       </View>
 
-      {renderSection('Trending Crates', trendingCrates)}
-      {renderSection("Friends' Favorites", friendsFavorites)}
-      {renderSection('Hidden Gems', hiddenGems)}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Community Discussion</Text>
-        {communityDiscussions.map((post) => (
-          <View key={post.id} style={styles.discussionCard}>
-            <Image source={{ uri: post.image }} style={styles.avatar} />
-            <View style={styles.discussionContent}>
-              <Text style={styles.cardTitle}>{post.title}</Text>
-              <Text style={styles.metaText}>Posted by {post.user} · {post.time}</Text>
-              <Text style={styles.metaText}>{post.comments}</Text>
-              <TouchableOpacity style={styles.viewPostButton}>
-                <Text style={styles.viewPostText}>View Post</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-      </View>
+      {error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchSpotifyData}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          {renderSection('Featured Playlists', featuredPlaylists)}
+          {renderSection('Recently Played', recentlyPlayed.map((item: any) => item.track))}
+          {renderSection('Top Artists', topArtists)}
+        </>
+      )}
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
     paddingTop: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  authContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    padding: 20,
+  },
+  authTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 24,
+    color: colors.text,
+    marginBottom: 12,
+  },
+  authSubtitle: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  authButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
+  authButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: colors.buttonText,
   },
   navbar: {
     paddingHorizontal: 16,
@@ -110,19 +172,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   logo: {
+    fontFamily: 'Poppins-Bold',
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    color: colors.text,
   },
   section: {
     marginBottom: 24,
     paddingHorizontal: 16,
   },
   sectionTitle: {
+    fontFamily: 'Poppins-Bold',
     fontSize: 18,
-    fontWeight: 'bold',
     marginBottom: 12,
-    color: '#111',
+    color: colors.text,
   },
   card: {
     marginRight: 12,
@@ -135,46 +197,37 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   cardTitle: {
-    fontWeight: 'bold',
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 14,
+    color: colors.text,
   },
   cardSubtitle: {
+    fontFamily: 'Poppins-Regular',
     fontSize: 12,
-    color: '#777',
+    color: colors.textSecondary,
   },
-  discussionCard: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    padding: 12,
+  errorContainer: {
+    padding: 20,
+    alignItems: 'center',
   },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 12,
+  errorText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 16,
+    color: colors.error,
+    marginBottom: 12,
+    textAlign: 'center',
   },
-  discussionContent: {
-    flex: 1,
+  retryButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
   },
-  metaText: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
+  retryButtonText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+    color: colors.buttonText,
   },
-  viewPostButton: {
-    marginTop: 4,
-    backgroundColor: '#E0E0E0',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    alignSelf: 'flex-start'
-  },
-  viewPostText: {
-    fontSize: 12,
-    color: '#000',
-  }
 });
 
 export default HomeScreen;
